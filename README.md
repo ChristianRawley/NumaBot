@@ -24,33 +24,25 @@ The Discord Bot can be added to your server by clicking [here](https://discord.c
 
 If you want to run the code on your own bot download [node.js](https://nodejs.org/en) and [git](https://www.git-scm.com/downloads), then run the following command in your terminal:
 ````
-````
 git clone github.com/ChristianRawley/NumaBot
-````
 ````
 
 Download the required packages using the following command in your terminal:
 ````
-````
 npm i
-````
 ````
 
 Create a file in your main folder titled .env with the following:
 ````
-````
 TOKEN=your token here (found in the discord application portal)
 CLIENT=your client id here (found in the discord application portal)
-````
 ````
 Obviously, you will need to replace the text found after the "=" (equal) sign.
 
 To run the bot, run the commands:
 ````
-````
 node deploy.js
 node .
-````
 ````
 
 Your bot should now be online and ready to go.
