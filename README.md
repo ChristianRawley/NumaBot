@@ -41,8 +41,7 @@ Obviously, you will need to replace the text found after the "=" (equal) sign.
 
 To run the bot, run the commands:
 ````
-node deploy.js
-node .
+npm start
 ````
 
 Your bot should now be online and ready to go.

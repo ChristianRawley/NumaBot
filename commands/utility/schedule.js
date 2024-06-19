@@ -149,11 +149,12 @@ module.exports = {
                     act,
                     rem,
                     instructor,
-                    weeks
+                    weeks 
                 });
             }
         });
 
+        if (courses.length == 0) return await interaction.reply({content: 'No classes matched your search queries.', ephemeral: true});
         const select = new StringSelectMenuBuilder()
             .setCustomId('course')
             .setPlaceholder('Select a course')
