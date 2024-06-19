@@ -120,14 +120,14 @@ module.exports = {
         $('table tbody tr').each((index, element) => {
             if ($(element).find('td').length === 24) {
                 const columns = $(element).find('td');
+                const status = $(columns[0]).text().trim();
                 const crn = $(columns[1]).text().trim();
                 const title = $(columns[2]).text().trim();
                 const crsNum = $(columns[4]).text().trim();
                 const secNum = $(columns[5]).text().trim();
                 let meetingTime = $(columns[7]).text().trim()+$(columns[8]).text().trim()+$(columns[9]).text().trim()+$(columns[10]).text().trim()+$(columns[11]).text().trim()+" "+$(columns[14]).text().trim();
-                if (columns.next().length < 23) {
-                    meetingTime = "VARIES";
-                }
+                nextColumn = $(element).next('tr');
+                if ($(nextColumn.find('td')).length < 24) meetingTime += " & " + $(nextColumn.find('td')[1]).text().trim()+$(nextColumn.find('td')[2]).text().trim()+$(nextColumn.find('td')[3]).text().trim()+$(nextColumn.find('td')[4]).text().trim()+$(nextColumn.find('td')[5]).text().trim()+" "+$(nextColumn.find('td')[8]).text().trim();
                 const date = $(columns[15]).text().trim();
                 const location = $(columns[16]).text().trim();
                 const cap = $(columns[17]).text().trim();
@@ -137,6 +137,7 @@ module.exports = {
                 const weeks = $(columns[22]).text().trim();
 
                 courses.push({
+                    status,
                     crn,
                     title,
                     crsNum,
@@ -194,6 +195,7 @@ module.exports = {
         const menuCollector = response.createMessageComponentCollector({ componentType: ComponentType.StringSelect, time: 3_600_000 });
 
         menuCollector.on('collect', async i => {
+            let stat;
             let crn;
             let title;
             let crsNum;
@@ -208,6 +210,7 @@ module.exports = {
             let weeks;
             for (let j = 0; j < courses.length; j++) {
                 if (courses[j].crn == i.values[0]) {
+                    stat = courses[j].status;
                     crn = courses[j].crn;
                     title = courses[j].title;
                     crsNum = courses[j].crsNum;
@@ -222,13 +225,21 @@ module.exports = {
                     weeks = courses[j].weeks;
                 }
             }
-            let name = +instructor.substring(instructor.indexOf(" ")+1)+" "+instructor.substring(0, instructor.indexOf(","));
+            let name = instructor;
+            if (name !== "Staff") name = instructor.substring(instructor.indexOf(" ")+1)+" "+instructor.substring(0, instructor.indexOf(","));
             const embed = new EmbedBuilder()
-                .setTitle(title)
+                .setTitle(subject+crsNum+" "+title)
                 .setURL(`https://slbanformsp1-oc.uafs.edu:8888/banprod/hxskschd.P_ListSchClassSimple?sel_subj=abcde&sel_day=abcde&sel_status=abcde&term=${term}&sel_status=%25${status}&sel_subj=${subject}&sel_sec=%25${section}&sel_crse=${crs}&begin_hh=00&begin_mi=00&end_hh=00&end_mi=00`)
                 .setAuthor({name: "Taught by "+name})
-                .setDescription(`**${subject}${crsNum} ${title} [${secNum}]** is located in ${location}.
-                    There are **${act}/${cap}** students, and **${rem}** seats available.`)
+                .setDescription(`Course number (CRN): **${crn}**
+                    Status: **${stat}**
+                    Section: **${secNum}**
+                    Credits: **${crsNum.substring(crsNum.length-1)}**
+                    Students: **${act}/${cap}** | **${rem}** remaining seat(s) left.
+                    Meeting time: **${meetingTime}**
+                    Date: **${date}**
+                    Location: **${location}**
+                    Weeks: **${weeks}**`)
 
             await i.update({components: [], embeds: [embed]});
         });
