@@ -87,7 +87,10 @@ module.exports = {
 		await interaction.respond(options);
     },
 
-	async run(interaction) {
+	async run(interaction, db) {
+        let user = await db.collection("users").findOne({_id: interaction.user.id});
+        if (!user) await db.collection("users").insertOne({_id: interaction.user.id, favorite_courses: []});
+        user = await db.collection("users").findOne({_id: interaction.user.id});
         const term = interaction.options.getString('term');
         const subject = interaction.options.getString('subject');
         let status = interaction.options.getString('status');
@@ -127,7 +130,7 @@ module.exports = {
                 const secNum = $(columns[5]).text().trim();
                 let meetingTime = $(columns[7]).text().trim()+$(columns[8]).text().trim()+$(columns[9]).text().trim()+$(columns[10]).text().trim()+$(columns[11]).text().trim()+" "+$(columns[14]).text().trim();
                 nextColumn = $(element).next('tr');
-                if ($(nextColumn.find('td')).length < 24) meetingTime += " & " + $(nextColumn.find('td')[1]).text().trim()+$(nextColumn.find('td')[2]).text().trim()+$(nextColumn.find('td')[3]).text().trim()+$(nextColumn.find('td')[4]).text().trim()+$(nextColumn.find('td')[5]).text().trim()+" "+$(nextColumn.find('td')[8]).text().trim();
+                if ($(nextColumn.find('td')[1]).text().length < 2) meetingTime += " & " + $(nextColumn.find('td')[1]).text().trim()+$(nextColumn.find('td')[2]).text().trim()+$(nextColumn.find('td')[3]).text().trim()+$(nextColumn.find('td')[4]).text().trim()+$(nextColumn.find('td')[5]).text().trim()+" "+$(nextColumn.find('td')[8]).text().trim();
                 const date = $(columns[15]).text().trim();
                 const location = $(columns[16]).text().trim();
                 const cap = $(columns[17]).text().trim();
@@ -195,54 +198,51 @@ module.exports = {
 
         const menuCollector = response.createMessageComponentCollector({ componentType: ComponentType.StringSelect, time: 3_600_000 });
 
+        let chosenCourse;
         menuCollector.on('collect', async i => {
-            let stat;
-            let crn;
-            let title;
-            let crsNum;
-            let secNum;
-            let meetingTime;
-            let date;
-            let location;
-            let cap;
-            let act;
-            let rem;
-            let instructor;
-            let weeks;
             for (let j = 0; j < courses.length; j++) {
                 if (courses[j].crn == i.values[0]) {
-                    stat = courses[j].status;
-                    crn = courses[j].crn;
-                    title = courses[j].title;
-                    crsNum = courses[j].crsNum;
-                    secNum = courses[j].secNum;
-                    meetingTime = courses[j].meetingTime;
-                    date = courses[j].date;
-                    location = courses[j].location;
-                    cap = courses[j].cap;
-                    act = courses[j].act;
-                    rem = courses[j].rem;
-                    instructor = courses[j].instructor;
-                    weeks = courses[j].weeks;
+                    chosenCourse = j;
+                    break;
                 }
             }
-            let name = instructor;
-            if (name !== "Staff") name = instructor.substring(instructor.indexOf(" ")+1)+" "+instructor.substring(0, instructor.indexOf(","));
+            let name = courses[chosenCourse].instructor;
+            if (name !== "Staff") name = courses[chosenCourse].instructor.substring(courses[chosenCourse].instructor.indexOf(" ")+1)+" "+courses[chosenCourse].instructor.substring(0, courses[chosenCourse].instructor.indexOf(","));
             const embed = new EmbedBuilder()
-                .setTitle(subject+crsNum+" "+title)
+                .setTitle(subject+courses[chosenCourse].crsNum+" "+courses[chosenCourse].title)
+                .setColor('Navy')
                 .setURL(`https://slbanformsp1-oc.uafs.edu:8888/banprod/hxskschd.P_ListSchClassSimple?sel_subj=abcde&sel_day=abcde&sel_status=abcde&term=${term}&sel_status=%25${status}&sel_subj=${subject}&sel_sec=%25${section}&sel_crse=${crs}&begin_hh=00&begin_mi=00&end_hh=00&end_mi=00`)
                 .setAuthor({name: "Taught by "+name})
-                .setDescription(`Course number (CRN): **${crn}**
-                    Status: **${stat}**
-                    Section: **${secNum}**
-                    Credits: **${crsNum.substring(crsNum.length-1)}**
-                    Students: **${act}/${cap}** | **${rem}** remaining seat(s) left.
-                    Meeting time: **${meetingTime}**
-                    Date: **${date}**
-                    Location: **${location}**
-                    Weeks: **${weeks}**`)
+                .setDescription(`Course number (CRN): **${courses[chosenCourse].crn}**
+                    Status: **${courses[chosenCourse].status}**
+                    Section: **${courses[chosenCourse].secNum}**
+                    Credits: **${courses[chosenCourse].crsNum.substring(courses[chosenCourse].crsNum.length-1)}**
+                    Students: **${courses[chosenCourse].act}/${courses[chosenCourse].cap}** | **${courses[chosenCourse].rem}** remaining seat(s) left.
+                    Meeting time: **${courses[chosenCourse].meetingTime}**
+                    Date: **${courses[chosenCourse].date}**
+                    Location: **${courses[chosenCourse].location}**
+                    Weeks: **${courses[chosenCourse].weeks}**`)
 
-            await i.update({components: [], embeds: [embed]});
+            let favId = 'fav';
+            let favLabel = "Favorite";
+            let favStyle = ButtonStyle.Success;
+
+            let favoredCourse = await db.collection("users").findOne({_id: interaction.user.id, 'favorite_courses.crn': courses[chosenCourse].crn});
+            if (favoredCourse) {
+                favId = 'unfav';
+                favLabel = "Unfavorite";
+                favStyle = ButtonStyle.Danger;
+            }
+            const favButton = new ButtonBuilder()
+                .setCustomId(favId)
+                .setLabel(favLabel)
+                .setStyle(favStyle)
+                .setEmoji('⭐');
+        
+            const infoMenu = new ActionRowBuilder()
+                .addComponents(favButton);
+
+            await i.update({components: [infoMenu], embeds: [embed]});
         });
 
         const buttonCollector = response.createMessageComponentCollector({ componentType: ComponentType.Button, time: 3_600_000 })
@@ -250,7 +250,33 @@ module.exports = {
         var i = 0;
 
         buttonCollector.on('collect', async inter => {
-            if(inter.customId === "next") i += 25;
+            if (inter.customId === "fav") {
+                db.collection("users").findOneAndUpdate({_id: interaction.user.id}, {$push: {favorite_courses: {...courses[chosenCourse], term: term, subject: subject}}});
+                const favButton = new ButtonBuilder()
+                    .setCustomId('unfav')
+                    .setLabel('Unfavorite')
+                    .setStyle(ButtonStyle.Danger)
+                    .setEmoji('⭐');
+
+                const infoMenu = new ActionRowBuilder()
+                    .addComponents(favButton);
+                
+                return await inter.update({components: [infoMenu]});
+            }
+            if (inter.customId === "unfav") {
+                db.collection("users").findOneAndUpdate({_id: interaction.user.id}, {$pull: {favorite_courses: {['crn']: courses[chosenCourse].crn}}});
+                const favButton = new ButtonBuilder()
+                    .setCustomId('fav')
+                    .setLabel('Favorite')
+                    .setStyle(ButtonStyle.Success)
+                    .setEmoji('⭐');
+
+                const infoMenu = new ActionRowBuilder()
+                    .addComponents(favButton)
+
+                return await inter.update({components: [infoMenu]});
+            }
+            if (inter.customId === "next") i += 25;
             else i -= 25;
             if (i < 0) i = 0;
             let j = i+25;
