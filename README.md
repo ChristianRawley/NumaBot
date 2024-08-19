@@ -8,6 +8,7 @@ This is developed by yours truly, Christian Rawley. You can email me at christia
 - Filter and navigate between courses of available terms.
 - View basic course information and bookmark courses to a favorites list.
 - Open common links useful throughout college life.
+- Displays important academic and registration calendar dates.
 
 # Known Issues
 There are currently no known issues. If you find an issue, please submit it to the [issues page](https://github.com/ChristianRawley/NumaBot/issues).
