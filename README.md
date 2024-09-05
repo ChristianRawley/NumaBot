@@ -13,12 +13,13 @@ This is developed by yours truly, Christian Rawley. You can email me at christia
 # Planned Updates
 - Required books, prerequisites/corequisites, & descriptions to be added to each class (schedule command)
 - NUMA Link Organizations & Events
-- UAFS Dining
+- Campus Dining
 - University Events
-- Student Services (Location, Office Hours)
-- UAFS News
+- Student Services (location, office hours)
+- University News
 - Degree Plan searcher
 - Final exam schedule
+
 Please feel free to add additional ideas to be added to NumaBot!
 
 # Known Issues
