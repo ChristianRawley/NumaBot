@@ -10,6 +10,17 @@ This is developed by yours truly, Christian Rawley. You can email me at christia
 - Open common links useful throughout college life.
 - Displays important academic and registration calendar dates.
 
+# Planned Updates
+- Required books, prerequisites/corequisites, & descriptions to be added to each class (schedule command)
+- NUMA Link Organizations & Events
+- UAFS Dining
+- University Events
+- Student Services (Location, Office Hours)
+- UAFS News
+- Degree Plan searcher
+- Final exam schedule
+Please feel free to add additional ideas to be added to NumaBot!
+
 # Known Issues
 There are currently no known issues. If you find an issue, please submit it to the [issues page](https://github.com/ChristianRawley/NumaBot/issues).
 
