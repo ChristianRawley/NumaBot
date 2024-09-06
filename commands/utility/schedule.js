@@ -3,6 +3,10 @@ const axios = require('axios');
 const cheerio = require('cheerio');
 const https = require('https');
 const httpsAgent = new https.Agent({ rejectUnauthorized: false });
+
+import { constants } from "./constants/constants.js"
+import { createFavoriteButton, createNextButton, createPrevButton, createUnfavoriteButton } from "./utilities/utilities.js"
+
 axios.defaults.httpsAgent = httpsAgent;
 
 module.exports = {
@@ -26,34 +30,13 @@ module.exports = {
             .setName('status')
             .setDescription('Select status')
             .setRequired(true)
-            .addChoices(
-                { name: 'Any Status', value: '%'},
-                { name: 'Canceled', value: 'X'},
-                { name: 'Closed', value: 'C'},
-                { name: 'Completed', value: 'P'},
-                { name: 'In Progress', value: 'I'},
-                { name: 'Open', value: 'O'},
-                { name: 'Restricted', value: 'R'},
-                { name: 'Waitlisted', value: 'W'}))
+            .addChoices(...constants.STATUS_CHOICES))
         .addStringOption(option => 
             option
             .setName('section')
             .setDescription('Select section')
             .setRequired(true)
-            .addChoices(
-                { name: 'Any Section', value: '%'},
-                { name: 'Full-online', value: '%E'},
-                { name: 'Hybrid', value: '%Y'},
-                { name: 'Web-enhanced', value: '%D'},
-                { name: '8 Week', value: '%G'},
-                { name: 'Sequential', value: '%S'},
-                { name: 'Weekend', value: '%W'},
-                { name: 'Day', value: '0'},
-                { name: 'Night', value: '9'},
-                { name: 'Independent Study', value: '%A'},
-                { name: 'Block', value: '%B'},
-                { name: 'Honors', value: '%H'},
-                { name: 'Intersession/Maymester/Special', value: '%Z'}))
+            .addChoices(...constants.SECTION_CHOICES))
         .addStringOption(option => 
             option
             .setName('crs')
@@ -62,17 +45,16 @@ module.exports = {
     async autocomplete(interaction) {
         const focusedOption = interaction.options.getFocused(true);
         let choices;
-        const data = await axios.get('https://slbanformsp1-oc.uafs.edu:8888/banprod/hxskschd.FS_P_Schedule');
+        const data = await axios.get(constants.SCHEDULE_URL);
         const $ = cheerio.load(data.data);
-        if (focusedOption.name === 'term') {
-            choices = $('select[name="term"] option').map((index, element) => {
-                return {
-                    name: $(element).text(),
-                    value: $(element).val()
-                }
-            }).get();
-        } else if (focusedOption.name === 'subject') {
-            choices = $('select[name="sel_subj"] option').map((index, element) => {
+
+        const focusedOptions = {
+            'term': 'term',
+            'subject': 'sel_subj'
+        }
+
+        if (focusedOptions[focusedOption.name]) {
+            choices = $(`select[name="${focusedOptions[focusedOption.name]}"] option`).map((index, element) => {
                 return {
                     name: $(element).text(),
                     value: $(element).val()
@@ -81,23 +63,39 @@ module.exports = {
         }
 
 		const filtered = choices.filter(choice => choice.name.toLowerCase().startsWith(focusedOption.value.toLowerCase()));
-        if (filtered.length > 25) options = filtered.slice(0, 25);
-        else options = filtered;
     
-		await interaction.respond(options);
+		await interaction.respond(filtered.slice(0, 25));
+    },
+
+    async createUserIfNew(interaction, db) {
+        try {
+            await db.collection("users").insertOne({_id: interaction.user.id, favorite_courses: []});
+        } catch(error) {} //TODO: Add the correct error here for duplicate keys
+    },
+
+    async createButtons() {
+        const urlButton = new ButtonBuilder()
+            .setLabel('View in browser')
+            .setStyle(ButtonStyle.Link)
+            .setURL(`${constants.BASE_SCHEDULE_URL}/hxskschd.P_ListSchClassSimple?sel_subj=abcde&sel_day=abcde&sel_status=abcde&term=${term}&sel_status=%25${status}&sel_subj=${subject}&sel_sec=%25${section}&sel_crse=${crs}&begin_hh=00&begin_mi=00&end_hh=00&end_mi=00`)
+        
+        const prevButton = createPrevButton()
+            .setDisabled(true);
+
+        const nextButton = createNextButton()
+            .setDisabled(courses.length <= 25);
+
+        return [urlButton, prevButton, nextButton];
     },
 
 	async run(interaction, db) {
-        let user = await db.collection("users").findOne({_id: interaction.user.id});
-        if (!user) await db.collection("users").insertOne({_id: interaction.user.id, favorite_courses: []});
-        user = await db.collection("users").findOne({_id: interaction.user.id});
+        await this.createUserIfNew(interaction, db)
         const term = interaction.options.getString('term');
         const subject = interaction.options.getString('subject');
-        let status = interaction.options.getString('status');
-        if (status == "%") status = "";
+        const status = interaction.options.getString('status') === "%" ? "" : interaction.options.getString('status');
         const section = interaction.options.getString('section');
-        const crs = interaction.options.getString('cts') ?? '';
-        let data = await axios.get('https://slbanformsp1-oc.uafs.edu:8888/banprod/hxskschd.FS_P_Schedule');
+        const crs = interaction.options.getString('cts') ?? "";
+        let data = await axios.get(constants.SCHEDULE_URL);
         let $ = cheerio.load(data.data);
 
         let options = $('select[name="term"] option');
@@ -117,7 +115,7 @@ module.exports = {
 
         if (!dataArray.includes(interaction.options.getString('subject'))) return await interaction.reply({content: "Invalid subject search query, please select from the autocomplete options.", ephemeral: true});
 
-        data = await axios.get(`https://slbanformsp1-oc.uafs.edu:8888/banprod/hxskschd.P_ListSchClassSimple?sel_subj=abcde&sel_day=abcde&sel_status=abcde&term=${term}&sel_status=%25${status}&sel_subj=${subject}&sel_sec=%25${section}&sel_crse=${crs}&begin_hh=00&begin_mi=00&end_hh=00&end_mi=00`);
+        data = await axios.get(`${constants.BASE_SCHEDULE_URL}/hxskschd.P_ListSchClassSimple?sel_subj=abcde&sel_day=abcde&sel_status=abcde&term=${term}&sel_status=%25${status}&sel_subj=${subject}&sel_sec=%25${section}&sel_crse=${crs}&begin_hh=00&begin_mi=00&end_hh=00&end_mi=00`);
         $ = cheerio.load(data.data);
         let courses = [];
         $('table tbody tr').each((index, element) => {
@@ -171,28 +169,11 @@ module.exports = {
             );
         });
 
-        const urlButton = new ButtonBuilder()
-            .setLabel('View in browser')
-            .setStyle(ButtonStyle.Link)
-            .setURL(`https://slbanformsp1-oc.uafs.edu:8888/banprod/hxskschd.P_ListSchClassSimple?sel_subj=abcde&sel_day=abcde&sel_status=abcde&term=${term}&sel_status=%25${status}&sel_subj=${subject}&sel_sec=%25${section}&sel_crse=${crs}&begin_hh=00&begin_mi=00&end_hh=00&end_mi=00`)
-        
-        const prevButton = new ButtonBuilder()
-            .setDisabled(true)
-            .setCustomId('prev')
-            .setStyle(ButtonStyle.Primary)
-            .setEmoji('1251027880935297126');
-
-        const nextButton = new ButtonBuilder()
-            .setDisabled(courses.length <= 25)
-            .setCustomId('next')
-            .setStyle(ButtonStyle.Primary)
-            .setEmoji('1251027909347508247');
-
         const menu = new ActionRowBuilder()
 			.addComponents(select);
         
         const buttons = new ActionRowBuilder()
-            .addComponents(prevButton, nextButton, urlButton);
+            .addComponents(...this.createButtons());
 
         const response = await interaction.reply({components: [menu, buttons], ephemeral: true});
 
@@ -211,7 +192,7 @@ module.exports = {
             const embed = new EmbedBuilder()
                 .setTitle(subject+courses[chosenCourse].crsNum+" "+courses[chosenCourse].title)
                 .setColor('Navy')
-                .setURL(`https://slbanformsp1-oc.uafs.edu:8888/banprod/hxskschd.P_ListSchClassSimple?sel_subj=abcde&sel_day=abcde&sel_status=abcde&term=${term}&sel_status=%25${status}&sel_subj=${subject}&sel_sec=%25${section}&sel_crse=${crs}&begin_hh=00&begin_mi=00&end_hh=00&end_mi=00`)
+                .setURL(`${constants.BASE_SCHEDULE_URL}/hxskschd.P_ListSchClassSimple?sel_subj=abcde&sel_day=abcde&sel_status=abcde&term=${term}&sel_status=%25${status}&sel_subj=${subject}&sel_sec=%25${section}&sel_crse=${crs}&begin_hh=00&begin_mi=00&end_hh=00&end_mi=00`)
                 .setAuthor({name: "Taught by "+name})
                 .setDescription(`Course number (CRN): **${courses[chosenCourse].crn}**
                     Status: **${courses[chosenCourse].status}**
@@ -223,24 +204,12 @@ module.exports = {
                     Location: **${courses[chosenCourse].location}**
                     Weeks: **${courses[chosenCourse].weeks}**`)
 
-            let favId = 'fav';
-            let favLabel = "Favorite";
-            let favStyle = ButtonStyle.Success;
-
             let favoredCourse = await db.collection("users").findOne({_id: interaction.user.id, 'favorite_courses.crn': courses[chosenCourse].crn});
-            if (favoredCourse) {
-                favId = 'unfav';
-                favLabel = "Unfavorite";
-                favStyle = ButtonStyle.Danger;
-            }
-            const favButton = new ButtonBuilder()
-                .setCustomId(favId)
-                .setLabel(favLabel)
-                .setStyle(favStyle)
-                .setEmoji('⭐');
+            
+            const button = favoredCourse ? createUnfavoriteButton() : createFavoriteButton();
         
             const infoMenu = new ActionRowBuilder()
-                .addComponents(favButton);
+                .addComponents(button);
 
             await i.update({components: [infoMenu], embeds: [embed]});
         });
@@ -249,14 +218,10 @@ module.exports = {
 
         var i = 0;
 
-        buttonCollector.on('collect', async inter => {
+        buttonCollector.on('collect', async inter => { //This shares so much with favorites. Should try and combine them somewhere else.
             if (inter.customId === "fav") {
                 db.collection("users").findOneAndUpdate({_id: interaction.user.id}, {$push: {favorite_courses: {...courses[chosenCourse], term: term, subject: subject}}});
-                const favButton = new ButtonBuilder()
-                    .setCustomId('unfav')
-                    .setLabel('Unfavorite')
-                    .setStyle(ButtonStyle.Danger)
-                    .setEmoji('⭐');
+                const favButton = createUnfavoriteButton();
 
                 const infoMenu = new ActionRowBuilder()
                     .addComponents(favButton);
@@ -265,11 +230,7 @@ module.exports = {
             }
             if (inter.customId === "unfav") {
                 db.collection("users").findOneAndUpdate({_id: interaction.user.id}, {$pull: {favorite_courses: {['crn']: courses[chosenCourse].crn}}});
-                const favButton = new ButtonBuilder()
-                    .setCustomId('fav')
-                    .setLabel('Favorite')
-                    .setStyle(ButtonStyle.Success)
-                    .setEmoji('⭐');
+                const favButton = createFavoriteButton();
 
                 const infoMenu = new ActionRowBuilder()
                     .addComponents(favButton)
@@ -297,17 +258,12 @@ module.exports = {
 
             const menuNew = new ActionRowBuilder()
                 .addComponents(selectNew);
-            const prevButtonNew = new ButtonBuilder()
+
+            const prevButtonNew = createPrevButton()
                 .setDisabled(i == 0)
-                .setCustomId('prev')
-                .setStyle(ButtonStyle.Primary)
-                .setEmoji('1251027880935297126');
             
-            const nextButtonNew = new ButtonBuilder()
+            const nextButtonNew = createNextButton()
                 .setDisabled(j == courses.length)
-                .setCustomId('next')
-                .setStyle(ButtonStyle.Primary)
-                .setEmoji('1251027909347508247');
 
             const buttonsNew = new ActionRowBuilder()
                 .addComponents(prevButtonNew, nextButtonNew, urlButton);
