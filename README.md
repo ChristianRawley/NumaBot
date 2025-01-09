@@ -1,3 +1,5 @@
+This project is deprecated as UAFS moves away from Banner and into Workday.
+
 # NumaBot: The perfect Discord bot for UAFS students
 This project is a fun and simple Discord bot I started working on the summer before my first semester at UAFS. It is open-source and all are welcomed to contribute to it.
 I am hoping to turn this into a React Native application if I have the time and finish most of the features I want to add to the bot.
